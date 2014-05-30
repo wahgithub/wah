@@ -508,7 +508,7 @@ class healthcenter extends module{
             if ($post_vars["submitconsult"] || $get_vars["enter_consult"] || $post_vars["confirm_add_consult"]) {
                 //$post_vars["consult_id"] = $get_vars["enter_consult"];
                 // confirms consult for found patients		                
-		$this->process_consult($menu_id, $post_vars, $get_vars);
+				$this->process_consult($menu_id, $post_vars, $get_vars);
             }
             if ($post_vars["submitsearch"]) {
                 // lists down search results for patient
@@ -900,8 +900,9 @@ class healthcenter extends module{
     }
 	
 	function compute_bmi($height,$weight){
+		//BASIS: http://apps.who.int/bmi/index.jsp?introPage=intro_3.html
 
-		echo "Body Mass Index: ";
+		echo "<a href='#' onclick=\"javascript:alert('BMI Formula: kg/(meters * meters). If BMI is < 18.5, UNDERWEIGHT. If BMI is >=18.5 and <25, NORMAL. If BMI is >=25 and <30, OVERWEIGHT. If BMI >=30, OBESE'); return false; \" alt='Click to view BMI range'>Body Mass Index:</a>";
 		$ht_cm = $height / 100;			
 		
 		if($ht_cm!=0):		
@@ -1286,13 +1287,13 @@ class healthcenter extends module{
         if ($result) {
 	    print "<a name='consults'></a>";
 
-            print "<span class='patient'>".FTITLE_CONSULTS_TODAY."</span><br>";
+        print "<span class='patient'>".FTITLE_CONSULTS_TODAY."</span><br>";
 
 	    healthcenter::show_tab_headers($arr_facility);
 
             print "<table width=600 bgcolor='#FFFFFF' cellpadding='3' cellspacing='0' style='border: 2px solid black'>";
             print "<tr><td>";
-            print "<span class='tinylight'>HIGHLIGHTED NAMES OR THOSE MARKED WITH <img src='../images/star.gif' border='0'/> WILL SEE PHYSICIAN.</span><br/>";
+            print "<span class='tinylight'>NAMES IN <font style='color:#FFFF33;background-color:black;'><b>YELLOW</b></font> OR THOSE MARKED WITH <img src='../images/star.gif' border='0'/> WILL SEE PHYSICIAN. NAMES IN <font style='color:#33FFFF;background-color:black;'><b>CYAN</b></font> ARE THOSE PRESCRIBED WITH MEDICINES AFTER THE CONSULTATION.</span><br/>";
             if (mysql_num_rows($result)) {
                 // initialize array index
                 $i=0;
@@ -1303,7 +1304,13 @@ class healthcenter extends module{
 
                     $q_lab = mysql_query("SELECT request_id,request_done FROM m_consult_lab WHERE patient_id='$pid' AND consult_id='$cid'") or die("Cannot query 1224".mysql_error());
 
-                    if(mysql_num_rows($q_lab)!=0):
+					$q_treatment = mysql_query("SELECT notes_plan FROM m_consult_notes WHERE patient_id='$pid' AND consult_id='$cid'") or die("Cannot query 1306: ".mysql_error());
+
+					list($notes_plan) = mysql_fetch_array($q_treatment);
+					
+					$notes_plan = trim($notes_plan);
+
+					if(mysql_num_rows($q_lab)!=0):
                         $arr_done = array();
                         $arr_id = array();
                         while(list($req_id,$done_status) = mysql_fetch_array($q_lab)){
@@ -1318,12 +1325,15 @@ class healthcenter extends module{
                         $request_id = $done = "";
                     endif;
 
-
                     $visits = healthcenter::get_total_visits($pid);
-                    $consult_array[$i] = "<a href='".$_SERVER["PHP_SELF"]."?page=CONSULTS&menu_id=$consult_menu_id&consult_id=$cid&ptmenu=DETAILS' title='".INSTR_CLICK_TO_VIEW_RECORD."' ".($see_doctor=="Y"?"style='background-color: #FFFF33'":"").">".
-                    "<b>$plast, $pfirst</b></a> [$visits] ".($see_doctor=="Y"?"<img src='../images/star.gif' border='0'/>":"").(($request_id!="")?(($done=="Y")?"<a href='$_SERVER[PHP_SELF]?$url' title='lab completed'><img src='../images/lab.png' width='15px' height='15px' border='0' alt='lab completed' /></a>":"<a href='$_SERVER[PHP_SELF]?$url' title='lab pending'><img src='../images/lab_untested.png' width='15px' height='15px' border='0' alt='lab pending' /></a>"):"");
-		
-		    $consult_array[$i] = $consult_array[$i].$this->check_icons($pid,$cid,$consult_menu_id);
+                    $consult_array[$i] = "<a href='".$_SERVER["PHP_SELF"]."?page=CONSULTS&menu_id=$consult_menu_id&consult_id=$cid&ptmenu=DETAILS' title='".INSTR_CLICK_TO_VIEW_RECORD."' ".
+					
+					//($see_doctor=="Y"?"style='background-color: #FFFF33'":"").
+					(($notes_plan!="")?"style='background-color: #33FFFF'":($see_doctor=="Y"?"style='background-color: #FFFF33'":"")).
+					
+					">"."<b>$plast, $pfirst</b></a> [$visits] ".($see_doctor=="Y"?"<img src='../images/star.gif' border='0'/>":"").(($request_id!="")?(($done=="Y")?"<a href='$_SERVER[PHP_SELF]?$url' title='lab completed'><img src='../images/lab.png' width='15px' height='15px' border='0' alt='lab completed' /></a>":"<a href='$_SERVER[PHP_SELF]?$url' title='lab pending'><img src='../images/lab_untested.png' width='15px' height='15px' border='0' alt='lab pending' /></a>"):"");
+					
+				    $consult_array[$i] = $consult_array[$i].$this->check_icons($pid,$cid,$consult_menu_id);
 			
                     $i++;
                 }
@@ -1402,6 +1412,7 @@ class healthcenter extends module{
                 }
             } else {
                 if ($post_vars["confirm_add_consult"]=="No") {
+					echo 'nosilazerep';
                     header("location: ".$_SERVER["PHP_SELF"]."?page=CONSULTS&menu_id=".$get_vars["menu_id"]."&consult_id=$insert_id&ptmenu=DETAILS");
                 }
             }
@@ -1539,11 +1550,16 @@ function hypertension_code() {
             } elseif ($post_vars["consult_patient_id"]) {
                 $patient_id = $post_vars["consult_patient_id"];
             }
-            print "<font color='red' size='5'><b>You are attempting to load a patient that is already in today's consult. Are you sure you want to load this patient's records again?</b></font><br />";
+            /* print "<font color='red' size='5'><b>You are attempting to load a patient that is already in today's consult. Are you sure you want to load this patient's records again?</b></font><br />";
             print "<input type='hidden' name='patient_id' value='$patient_id'/> ";
             print "<input type='hidden' name='sked_id' value='".$get_vars["sked_id"]."'/> ";
             print "<input type='submit' name='confirm_add_consult' value='Yes' class='textbox' style='font-weight: bold; font-size:14pt; background-color: #FFFF33; border: 2px solid black' /> ";
-            print "<input type='submit' name='confirm_add_consult' value='No' class='textbox' style='font-weight: bold; font-size:14pt; background-color: #FFCC33; border: 2px solid black' /> ";
+            print "<input type='submit' name='confirm_add_consult' value='No' class='textbox' style='font-weight: bold; font-size:14pt; background-color: #FFCC33; border: 2px solid black' /> "; */
+
+			print "<font color='red' size='5'><b>The patient you are trying to search is already on active consultation. Please check the CONSULTS TODAY box and click the patient's name to load the individual treatment record.</b></font><br />";
+            print "<input type='hidden' name='patient_id' value='$patient_id'/> ";
+            print "<input type='hidden' name='sked_id' value='".$get_vars["sked_id"]."'/> ";
+  
             print "</td></tr>";
             print "</form>";
             print "</table>";
@@ -1558,10 +1574,13 @@ function hypertension_code() {
         }
 
         $date = date("Y-m-d");
-        $sql = "select patient_id from m_consult ".
+        /*$sql = "select patient_id from m_consult ".
              "where consult_end = '0000-00-00 00:00:00' and ".
-             "patient_id = '$patient_id' and to_days(consult_date) = to_days('$date')";
-        if ($result = mysql_query($sql)) {
+             "patient_id = '$patient_id' and to_days(consult_date) = to_days('$date')"; */
+		
+		$sql = "SELECT patient_id FROM m_consult WHERE consult_end = '0000-00-00 00:00:00' AND patient_id='$patient_id'";
+
+        if ($result = mysql_query($sql)) { 
             if (mysql_num_rows($result)) {
                 list($pt_in_consult) = mysql_fetch_array($result);
                 return $pt_in_consult;
